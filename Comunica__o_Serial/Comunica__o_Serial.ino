@@ -35,7 +35,7 @@ void loop() {
 }
 
 void inicializacao(){
-    Serial.println("Manda a nova configuracao logo seu mala");
+    while (Serial.available() <= 0){Serial.println("Aguardando Conexao");}
     while (Serial.available() <= 0){};
     config = (char)Serial.read(); 
     if (config=='C'){
