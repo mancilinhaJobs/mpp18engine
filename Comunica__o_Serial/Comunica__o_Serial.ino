@@ -7,7 +7,7 @@ int valorStrain_2 = 0;        // valor lido do extensometro superior (0-1023==0-
 volatile unsigned long tempoAntes = 0;
 volatile unsigned long tempo_1_Volta=0;
 volatile unsigned long delta_T=0;
-volatile unsigned long tempoLimite=10000000;
+volatile unsigned long tempoLimite=1000000;
 volatile unsigned int voltas = 0;
 volatile int estado=0;
 volatile unsigned rpm = 0;
