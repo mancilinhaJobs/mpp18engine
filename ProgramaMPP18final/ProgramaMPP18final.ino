@@ -1,27 +1,29 @@
 #include <Servo.h>
 
 char config;   // byte para verificacao do tipo de configuracao
-int tipo;      // 0 = regular e open 1 - micro;
+int tipo;      // 0 = regular ou open 1 = micro;
 char comando;   //para alterar velocidade do motor ou mudar a configuracao do programa
 
 const int entradaStrain_1 = A0;  // entrada analogica do extensometro superior
 const int entradaStrain_2 = A1;  // entrada analogica do extensometro inferior
-int valorStrain_1 = 0;        // valor lido do extensometro superior (0-1023==0-5V)
-int valorStrain_2 = 0;        // valor lido do extensometro superior (0-1023==0-5V)
+int valorStrain_1 = 0;        // valor lido do extensometro superior (0-1023 == 0-5V)
+int valorStrain_2 = 0;        // valor lido do extensometro inferior (0-1023 == 0-5V)
 
-Servo acelerador;          //o acelerador da open e da regular e um servo   
+Servo acelerador;          //o acelerador da open e da regular eh um servo, sera o pino 9 do arduino   
 int motorMicro = 10;       //pino onde o motor da micro sera ligado
 
 int aceleracaoMin; // a ser usado somente para regular e open
 int aceleracaoMax; // a ser usado somente para regular e open
-int deltaAceleracao;
+int deltaAceleracao; //diferença entre o a aceleraçao minima e a maxima
 
 int pos=90;
 int leitura = 0;
 int porcentMotor = 0;//porcentagem da velocidade do motor;
+int porcentAntes = 0;
 int  velocidade = 0;
 
-unsigned long tempoAtual;
+unsigned long deltaT; //variaveis a serem utilizadas no calculo da rpm
+unsigned long tempoAntes;
 
 void setup() {
         Serial.begin(9600);     // opens serial port, sets data rate to 9600 bps
@@ -30,15 +32,14 @@ void setup() {
 
 void loop() {
   
-         
-        if(tipo=='0'){
+        if(tipo=='0'&&porcentMotor!= porcentAntes){
             velocidade = map(porcentMotor, 0, 100, aceleracaoMin, aceleracaoMax);
             Serial.print("velocidade");
             Serial.println(velocidade);
             acelerador.write(velocidade);
         }
-        if(tipo=='1'){
-            velocidade = map(porcentMotor, 0, 100, 0, 255);
+        if(tipo=='1'&&porcentMotor!= porcentAntes){
+            velocidade = map(porcentMotor, 0, 100, 0,255);
             analogWrite(motorMicro,velocidade);
         }
         valorStrain_1 = analogRead(entradaStrain_1);
@@ -50,44 +51,41 @@ void loop() {
         if (Serial.available()>0){
           comando = (char)Serial.read();//tenho que pensar no loop
           switch (comando){
-            case 'v': Serial.println("Qual a nova porcentagem da velocidade do motor:");
-                      while(Serial.available()<=0){}
-                      leitura = Serial.read()-48;//nao esta detectando erros!!!!
-                      Serial.println(leitura);
-                      porcentMotor = (10*leitura);//tah muito zuado....
-                      while(Serial.available()<=0){}
-                      leitura = Serial.read()-48;
-                      Serial.println(leitura);
-                      porcentMotor += leitura;
+            case 'v': Serial.println("Qual a nova porcentagem da velocidade do motor?");
+                      while(Serial.available()<=0){};
+                      porcentAntes = porcentMotor;
+                      porcentMotor = (int)Serial.read();
                       Serial.print("Ok, motor em:");
-                      Serial.println(porcentMotor);
-                      Serial.println(leitura);
+                      Serial.println(porcentMotor,DEC);
+                      break;         
+            case 'c': if(tipo == '0'){acelerador.write(aceleracaoMin)};//caso o usuario queira mudar a configuracao o programa para os motores e inicializa de novo
+                      if(tipo == '1'){analog.write(motorMicro,0)};
+                      inicializacao();
                       break;
-                      delay(1000);
-            case 'c': inicializacao();
+            default:  Serial.println("Comando invalido(v:alterar velocidade c:configuracao");
                       break;
-            default: Serial.println("Comando invalido(v:alterar velocidade c:configuracao");
-                     break;
           }
         }
-        delay(1000);      
+        delay(1000);//o ciclo soh eh repitido a cada um segundo, para nao ficar mandando muitos dados.
 }
 
 void sensorRPM()
 {
   detachInterrupt(0);
   Serial.print("i");
-  tempoAtual+=micros();
+  deltaT = micros()-tempoAntes;
+  tempoAntes = micros();
   Serial.println(tempoAtual);
   attachInterrupt(0, sensorRPM, RISING);
 }
 
 void inicializacao()
 {
-    pos=90;
+    pos = 90;
     leitura = 0;
     velocidade = 0;
     porcentMotor = 0;
+    int porcentAntes = 0;
     boolean ready = false;
     while (!ready){
        while (Serial.available()<=0){
@@ -112,7 +110,7 @@ void inicializacao()
                      Serial.println("Ready: 001");
                      ready = true;
                      break;
-           default: Serial.println("Configuracao invalida");
+           default:  Serial.println("Configuracao invalida");
                      Serial.println("Erro: 001");
                      break;
           }         
